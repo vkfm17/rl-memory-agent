@@ -34,11 +34,14 @@ Tiny model/API (local Qwen2.5-0.5B-Instruct, SmolLM2, or TinyLlama)
 - Balance correctness
 - Token efficiency
 
-```reward = (
+```
+python
+reward = (
     correct_answer * 10
     - (memory_tokens * 0.002)
     - incorrect_confident_answer * 5
-)```
+)
+```
 
 Other ideas:
 - Hallucination penalties
@@ -59,27 +62,10 @@ Other ideas:
  
 ## Setup
 
-State:
-state = {
-    "token_budget_remaining": int,
-    "message_age": int,
-    "importance_score": float,
-    "is_fact_message": bool,
-    "retrieval_likelihood": float,
-}
-
-Then later add:
-
-semantic embeddings
-contradiction detection
-recency curves
-
-
 Actions:
-KEEP
-SUMMARIZE
-DROP
-
+- KEEP
+- DROP
+- SUMMARIZE
 
 Episode:
 1. User message
@@ -95,8 +81,6 @@ Remember:
 - Birthday
 - Hometown
 
-Test retrieval later
-
 ### Retrieval Task
 "My birthday is June 9."
 ...
@@ -110,7 +94,6 @@ Test retrieval later
 ### Long-context distraction
 
 Many irrelevant messages to learn selective retention
-
 
 ## MVP
 
