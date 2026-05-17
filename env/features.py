@@ -1,11 +1,9 @@
 import re
-from sentence_transformers import SentenceTransformer
+
 import numpy as np
+from sentence_transformers import SentenceTransformer
 
-
-# -------------------------
 # Hard-coded heuristics
-# -------------------------
 
 KNOWN_LOCATIONS = {
     "hoboken",
@@ -33,32 +31,28 @@ TEMPORAL_WORDS = {
     "formerly",
 }
 PERSONAL_KEYWORDS = {
-        "my",
-        "i am",
-        "i live",
-        "favorite",
-        "birthday",
+    "my",
+    "i am",
+    "i live",
+    "favorite",
+    "birthday",
 }
 
 
-# -------------------------
 # Lazy-loaded encoder
-# -------------------------
 
 _encoder = None
+
 
 def get_encoder():
     global _encoder
     if _encoder is None:
-        _encoder = SentenceTransformer(
-            "all-MiniLM-L6-v2"
-        )
+        _encoder = SentenceTransformer("all-MiniLM-L6-v2")
     return _encoder
 
 
-# -------------------------
 # Feature extractors
-# -------------------------
+
 
 def contains_number(message: str) -> bool:
     """
@@ -155,41 +149,34 @@ def embed_message(message: str) -> np.ndarray:
         embedding,
         dtype=np.float32,
     )
-    embedding = (
-        embedding /
-        np.linalg.norm(embedding)
-    )
+    embedding = embedding / np.linalg.norm(embedding)
     return embedding
 
+
 def build_feature_vector(message: str) -> np.ndarray:
-    return np.array([
-        contains_number(message),
-        contains_location(message),
-        contains_name(message),
-        message_length(message),
-        retrieval_frequency(message),
-        importance_prior(message),
-        contains_temporal_update(message),
-    ], dtype=np.float32)
+    return np.array(
+        [
+            contains_number(message),
+            contains_location(message),
+            contains_name(message),
+            message_length(message),
+            retrieval_frequency(message),
+            importance_prior(message),
+            contains_temporal_update(message),
+        ],
+        dtype=np.float32,
+    )
+
 
 def build_embedding_features(
     message: str,
-    memory_size: int,
-    current_step: int,
+    metadata: np.ndarray,
 ) -> np.ndarray:
-    """Use embeddings, memory size, and message age to """
+    """Use embeddings, memory size, and message age to"""
     embedding = embed_message(message)
-    metadata = np.array([
-        memory_size,
-        current_step,
-    ], dtype=np.float32)
-    return np.concatenate([
-        embedding,
-        metadata,
-    ])
-
-# [
-  # 384-dim sentence embedding,
-  # memory_size,
-  # message_age,
-# ]
+    return np.concatenate(
+        [
+            embedding,
+            metadata,
+        ]
+    )

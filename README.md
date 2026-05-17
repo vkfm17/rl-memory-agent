@@ -1,41 +1,150 @@
-# Reinforcement Learning For Conversational Memory Management / Token-Efficient Conversational Memory via Reinforcement Learning
+# Reinforcement Learning for Conversational Memory Management
 
-Learn memory retention policy for an LLM chatbot. This is a sequential compression problem where the agent learns, "Which memories are worth paying token cost for?"
+Adaptive Context Compression and Dynamic Memory Consolidation for LLM Agents
 
-Dynamic memory consolidation
-Adaptive Context Compression for LLM Agents
+Learn a memory-retention policy for conversational agents under constrained context budgets.
 
-## Components
+This project explores reinforcement learning for:
+- Conversational memory retention
+- Semantic memory compression
+- Contradiction resolution
+- Token-efficient context management
 
-### 1. Conversation Environment
+The core question:
 
-A synthetic multi-turn conversation
+> Which memories are worth paying token cost for?
 
-User: My favorite color is blue.
-User: I live in Hoboken.
-...
-User: What city do I live in?
+Instead of naive truncation or retrieval heuristics, the agent learns:
+- What to remember
+- What to forget
+- What to summarize
+- What to overwrite
 
-Correct answer: Hoboken
+It uses reward signals based on:
+- Retrieval correctness
+- Context efficiency
+- Stale-memory penalties
 
-### 2. Memory Manager (RL Agent)
+---
 
-At each step, decide
-- KEEP message
-- SUMMARIZE message
-- DROP message
+# Motivation
 
-### 3. Chatbot Model
+LLM agents have limited context windows. Current approaches typically rely on:
+- FIFO truncation
+- Embedding retrieval
+- Heuristics
+- Summarization pipelines
 
-Tiny model/API (local Qwen2.5-0.5B-Instruct, SmolLM2, or TinyLlama)
+This project frames conversational memory as a sequential decision-making problem:
 
-### 4. Reward Function
-
-- Balance correctness
-- Token efficiency
-
+```text
+incoming message
+    ↓
+memory policy
+    ↓
+KEEP / DROP / SUMMARIZE / REPLACE
+    ↓
+future retrieval reward
 ```
-python
+
+The objective is not maximal retention but rather:
+- Adaptive memory compression
+- Semantic memory consolidation
+- Efficient long-horizon recall
+
+---
+
+# Current Features
+
+## Semantic Memory Policy
+
+Observation space includes:
+- Sentence embeddings
+- Memory statistics
+- Temporal metadata
+
+using
+- `sentence-transformers`
+- `all-MiniLM-L6-v2`
+
+The agent must infer memory importance semantically.
+
+---
+
+## Memory Actions
+
+At each timestep the RL policy chooses:
+
+- `KEEP`
+- `DROP`
+- `SUMMARIZE`
+- `REPLACE_SIMILAR`
+
+### KEEP
+Store message in memory.
+
+### DROP
+Discard message entirely.
+
+### SUMMARIZE
+Compress message into lower-token representation.
+
+Example:
+
+```text
+"My birthday is June 9 and I love cake."
+↓
+"Birthday: June 9"
+```
+
+### REPLACE_SIMILAR
+Overwrite semantically related stale memories.
+
+Example:
+
+```text
+"I live in Boston."
+↓
+"I moved to Seattle."
+```
+
+The system learns semantic memory updating rather than FIFO truncation.
+
+---
+
+# Environment
+
+Synthetic multi-turn conversational environment built with Gymnasium.
+
+Example:
+
+```text
+User: I live in Hoboken.
+User: I enjoy hiking.
+User: I moved to Seattle.
+...
+User: Where do I live now?
+```
+
+Correct answer:
+
+```text
+Seattle
+```
+
+---
+
+# Reward Function
+
+The policy optimizes:
+
+- Retrieval accuracy
+- Memory efficiency
+- Contradiction resolution
+
+Current reward:
+
+```python
 reward = (
     correct_answer * 10
     - (memory_tokens * 0.002)
@@ -43,91 +152,195 @@ reward = (
 )
 ```
 
-Other ideas:
+Additional ideas:
 - Hallucination penalties
-- Latency penalities
+- Latency penalties
 - Summary compression bonuses
+- Stale-memory penalties
 
-## Tech Stack
+---
 
-- stable-baselines3 to start, then verl for distributed RLHF-style training
-- Rule-based QA oracle
-- Tiny local HF model
-- Gymnasium-style custom env
+# Tasks
 
-## Evaluation
-- Pandas
-- Matplotlib
-- W&B
- 
-## Setup
+## Retrieval Tasks
 
-Actions:
-- KEEP
-- DROP
-- SUMMARIZE
-
-Episode:
-1. User message
-2. Memory policy acts 
-3. Chatbot responds
-4. Environment checks correctness
-5. Reward assigned
-
-## Phase 1
-
-Remember:
-- Favorite movie
-- Birthday
-- Hometown
-
-### Retrieval Task
+```text
 "My birthday is June 9."
 ...
 "What's my birthday?"
+```
 
-### Contradiction Task
-"I moved from Boston to Seattle."
+---
+
+## Contradiction Tasks
+
+```text
+"I live in Boston."
+...
+"I moved to Seattle."
 ...
 "Where do I live now?"
+```
 
-### Long-context distraction
+These tasks require:
+- Memory replacement
+- Stale memory deletion
+- Temporal reasoning
 
-Many irrelevant messages to learn selective retention
+---
 
-## MVP
+## Long-Context Distraction
 
-### Milestone 1
+Large amounts of irrelevant conversation are inserted to test:
+- Selective retention
+- Compression
+- Retrieval robustness
 
-Rule-based memory manager: keep latest 5 messages.
+---
 
-### Milestone 2
+# Architecture
 
-RL memory policy: train PPO/GRPO agent.
+## Observation Space
 
-### Milestone 3
+Current observation includes:
 
-Add summarization action to compress older memories.
+```python
+[
+    current_message_embedding,
+    memory_size,
+    avg_memory_age,
+    max_memory_age,
+]
+```
 
-### Milestone 4
+Future versions may include:
+- Memory-summary embeddings
+- Retrieval-frequency statistics
+- Attention-based memory representations
 
-Evaluation:
-- Native truncation
-- Retrieval heuristics
-- RL policy
+---
 
+## Memory Representation
 
-## Structure
+Current memory entries:
 
+```python
+{
+    "message": "...",
+    "step": timestep,
+    "summarized": False,
+}
+```
+
+Future work:
+- Memory slots
+- Semantic memory graphs
+- Hierarchical memory
+- Learned memory decay
+
+---
+
+# Tech Stack
+
+## RL
+
+- `stable-baselines3`
+- PPO
+
+Future:
+- `verl`
+- distributed RLHF-style training
+- GRPO / RLOO
+
+---
+
+## NLP
+
+- `sentence-transformers`
+- `all-MiniLM-L6-v2`
+
+Future:
+- TinyLlama
+- SmolLM2
+- Qwen2.5-0.5B-Instruct
+
+---
+
+## Environment
+
+- Gymnasium custom environment
+
+---
+
+## Evaluation
+
+- Pandas
+- Matplotlib
+- Weights & Biases
+
+---
+
+# Evaluation Metrics
+
+Track:
+
+| Metric | Description |
+|---|---|
+| QA Accuracy | Correct retrieval |
+| Avg Context Tokens | Memory efficiency |
+| Compression Ratio | Token reduction |
+| Contradiction Accuracy | Correct stale-memory replacement |
+| Retention Ratio | Fraction of stored messages |
+| Latency | Inference cost |
+
+---
+
+# Baselines
+
+Compare against:
+
+- Keep last k
+- FIFO truncation
+- Random drop
+- Embedding retrieval
+- LRU memory
+- Summarize oldest
+
+---
+
+# Current Progress
+
+## Milestone 1
+Rule-based memory manager.
+
+## Milestone 2
+PPO memory-retention policy.
+
+## Milestone 3
+Semantic embeddings replacing handcrafted labels.
+
+## Milestone 4
+Contradiction-aware memory updating.
+
+## Milestone 5
+Summarization-based compression.
+
+---
+
+# Project Structure
+
+```text
 rl-memory-agent/
 │
 ├── env/
 │   ├── conversation_env.py
 │   ├── tasks.py
+│   ├── features.py
 │
 ├── memory/
 │   ├── policies.py
 │   ├── summarizer.py
+│   ├── similarity.py
 │
 ├── training/
 │   ├── train_ppo.py
@@ -137,33 +350,69 @@ rl-memory-agent/
 │   ├── metrics.py
 │
 ├── notebooks/
-│
 ├── results/
-│
 ├── README.md
 └── requirements.txt
+```
 
+---
 
-## Evaluation Metrics
+# Future Directions
 
-Track:
-- QA Accuracy: Did model remember correctly?
-- Avg Context Tokens: Memory efficiency
-- Compression Ratio: Saved tokens
-- Contradiction Resolution: Updated stale memories
-- Latency: Inference speed
+## Contextual Memory Policies
 
-Baselines:
-- Keep last K
-- FIFO truncation
-- Random drop
-- Embedding retrieval
-- LRU memory
-- Summarize oldest
+Current policy processes messages independently. Future policies may condition on:
+- Compressed memory state
+- Retrieval history
+- Memory summaries
 
-## Future Improvements
+Example:
 
-Eventually move from per-message actions to memory graph/slots, where agent decides:
-- Merge memories
-- Rewrite memories
-- Decay memories
+```python
+[
+    current_message_embedding,
+    memory_summary_embedding,
+]
+```
+
+This enables context-aware memory decisions and adaptive conversational state management.
+
+---
+
+## Memory Consolidation
+
+Move beyond append-only memory toward:
+- Semantic merging
+- Memory rewriting
+- Memory decay
+- Hierarchical summaries
+
+---
+
+## Scaling Experiments
+
+Increase distractor count:
+
+```text
+10 → 50 → 100 → 1000
+```
+
+Measure:
+- Retrieval accuracy
+- Compression efficiency
+- Memory stability
+
+---
+
+## Compression Curves
+
+Plot:
+
+```text
+accuracy vs memory budget
+```
+
+to analyze:
+- Compression-retrieval tradeoffs
+- Emergent memory policies
+- Semantic retention behavior

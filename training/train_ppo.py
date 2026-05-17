@@ -10,9 +10,7 @@ check_env(env)
 
 tensorboard_log = "./logs/"
 
-policy_kwargs = dict(
-    net_arch=[256, 256]
-)
+policy_kwargs = dict(net_arch=[256, 256])
 
 model = PPO(
     "MlpPolicy",
