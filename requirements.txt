@@ -1,0 +1,10 @@
+gymnasium
+stable-baselines3
+transformers
+torch
+accelerate
+sentence-transformers
+pandas
+matplotlib
+wandb
+tensorboard
