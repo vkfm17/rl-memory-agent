@@ -161,43 +161,26 @@ rl-memory-agent/
 └── requirements.txt
 
 
-Evaluation Metrics
+## Evaluation Metrics
 
 Track:
+- QA Accuracy: Did model remember correctly?
+- Avg Context Tokens: Memory efficiency
+- Compression Ratio: Saved tokens
+- Contradiction Resolution: Updated stale memories
+- Latency: Inference speed
 
-Metric	Meaning
-QA Accuracy	Did model remember correctly
-Avg Context Tokens	Memory efficiency
-Compression Ratio	Saved tokens
-Contradiction Resolution	Updated stale memories
-Latency	Inference speed
-Recommended Baselines
+Baselines:
+- Keep last K
+- FIFO truncation
+- Random drop
+- Embedding retrieval
+- LRU memory
+- Summarize oldest
 
-You NEED baselines.
+## Future Improvements
 
-Implement:
-
-Keep last K
-FIFO truncation
-Random drop
-Embedding retrieval
-LRU memory
-Summarize oldest
-
-Otherwise reviewers will complain.
-
-Very Important Future Improvement
-
-Right now actions are per-message.
-
-Eventually move to:
-
-Memory graph / memory slots
-
-Where agent decides:
-
-merge memories
-rewrite memories
-decay memories
-
-That becomes genuinely novel.
+Eventually move from per-message actions to memory graph/slots, where agent decides:
+- Merge memories
+- Rewrite memories
+- Decay memories
