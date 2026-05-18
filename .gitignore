@@ -1,5 +1,6 @@
 results/
 .DS_Store
+tensorboard/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

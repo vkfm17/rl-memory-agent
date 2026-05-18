@@ -1,25 +1,17 @@
-from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-
-@dataclass
-class MemorySnapshot:
-    step: int
-    message: str
-    memory: List[Dict[str, Any]]
-    answer: Optional[str]
+from typedefs import MemorySnapshot
 
 
 class MemoryTracker:
     def __init__(self):
-
-        self.timeline: List[MemorySnapshot] = []
+        self.timeline: list[MemorySnapshot] = []
 
     def log_step(
         self,
         step: int,
         message: str,
-        memory: List[Dict[str, Any]],
+        memory: list[dict[str, Any]],
         answer: str,
     ):
 

@@ -131,3 +131,145 @@ def generate_contradiction_conversation(num_distractors: int = 10):
         "question": question,
         "answer": new_city,
     }
+
+
+def generate_contradiction_chain():
+    return {
+        "conversation": [
+            {
+                "message": "I live in Boston.",
+                "fact_value": "Boston",
+                "step": 0,
+            },
+            {
+                "message": "I moved to Seattle.",
+                "fact_value": "Seattle",
+                "step": 1,
+            },
+            {
+                "message": "I moved to Chicago.",
+                "fact_value": "Chicago",
+                "step": 2,
+            },
+            {
+                "message": "I used to like pizza but now I prefer sushi.",
+                "fact_value": None,
+                "step": 3,
+            },
+            {
+                "message": "I moved to Austin last year.",
+                "fact_value": "Austin",
+                "step": 4,
+            },
+        ],
+        "question": "Where do I live now?",
+        "answer": "Austin",
+    }
+
+
+def generate_profile_with_updates():
+    return {
+        "conversation": [
+            {
+                "message": "My name is Alice.",
+                "fact_value": ("name", "Alice"),
+                "step": 0,
+            },
+            {
+                "message": "I live in Boston.",
+                "fact_value": ("location", "Boston"),
+                "step": 1,
+            },
+            {
+                "message": "My favorite color is blue.",
+                "fact_value": ("color", "blue"),
+                "step": 2,
+            },
+            {
+                "message": "I moved to Seattle.",
+                "fact_value": ("location", "Seattle"),
+                "step": 3,
+            },
+            {
+                "message": "My favorite color is green.",
+                "fact_value": ("color", "green"),
+                "step": 4,
+            },
+        ],
+        "question": "Where does Alice live?",
+        "answer": "Seattle",
+    }
+
+
+def generate_distractor_heavy():
+    return {
+        "conversation": [
+            {"message": "I like pizza.", "fact_value": None, "step": 0},
+            {"message": "The sky is nice today.", "fact_value": None, "step": 1},
+            {"message": "I bought a book yesterday.", "fact_value": None, "step": 2},
+            {
+                "message": "My favorite movie is Interstellar.",
+                "fact_value": "Interstellar",
+                "step": 3,
+            },
+            {"message": "I had coffee this morning.", "fact_value": None, "step": 4},
+            {"message": "I enjoy hiking.", "fact_value": None, "step": 5},
+            {
+                "message": "I changed my favorite movie to Inception.",
+                "fact_value": "Inception",
+                "step": 6,
+            },
+        ],
+        "question": "What is my favorite movie?",
+        "answer": "Inception",
+    }
+
+
+def generate_temporal_updates():
+    return {
+        "conversation": [
+            {"message": "I live in Boston.", "fact_value": "Boston", "step": 0},
+            {"message": "I am currently happy.", "fact_value": None, "step": 1},
+            {"message": "I moved to Seattle.", "fact_value": "Seattle", "step": 2},
+            {"message": "I used to live in Boston.", "fact_value": None, "step": 3},
+            {"message": "Now I live in Chicago.", "fact_value": "Chicago", "step": 4},
+        ],
+        "question": "Where do I live?",
+        "answer": "Chicago",
+    }
+
+
+def generate_multi_query():
+    return {
+        "conversation": [
+            {"message": "My name is Bob.", "fact_value": ("name", "Bob"), "step": 0},
+            {
+                "message": "I live in Miami.",
+                "fact_value": ("location", "Miami"),
+                "step": 1,
+            },
+            {
+                "message": "My favorite color is red.",
+                "fact_value": ("color", "red"),
+                "step": 2,
+            },
+            {
+                "message": "I moved to Denver.",
+                "fact_value": ("location", "Denver"),
+                "step": 3,
+            },
+        ],
+        "question": "Where does Bob live and what is his name?",
+        "answer": "Bob, Denver",
+    }
+
+
+def generate_hard_task():
+    tasks = [
+        generate_contradiction_chain,
+        generate_profile_with_updates,
+        generate_distractor_heavy,
+        generate_temporal_updates,
+        generate_multi_query,
+    ]
+    return random.choice(tasks)()
