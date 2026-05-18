@@ -406,13 +406,4 @@ Measure:
 
 ## Compression Curves
 
-Plot:
-
-```text
-accuracy vs memory budget
-```
-
-to analyze:
-- Compression-retrieval tradeoffs
-- Emergent memory policies
-- Semantic retention behavior
+Plot accuracy vs memory budget to analyze compression-retrieval tradeoffs, emergent memory policies, and semantic retention behavior.

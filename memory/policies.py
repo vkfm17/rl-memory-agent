@@ -1,33 +1,80 @@
 import random
 
-
-class RandomPolicy:
-    """Randomly select to drop or keep."""
-
-    def act(self, obs):
-        return random.randint(0, 1)
+from memory.similarity import (
+    find_most_similar_memory,
+)
+from typedefs import Action
 
 
-class KeepEverythingPolicy:
-    """Keep everything"""
-
-    def act(self, obs):
-        return 0
-
-
-class DropEverythingPolicy:
-    """Drop everything"""
-
-    def act(self, obs):
-        return 1
+class BasePolicy:
+    def act(
+        self,
+        current_msg,
+        memory,
+    ):
+        raise NotImplementedError
 
 
-"""
-Also add:
+class KeepLastKPolicy(BasePolicy):
+    def __init__(self, k=5):
 
-keyword heuristic
-TF-IDF importance
-random baseline
+        self.k = k
 
-These become evaluation baselines.
-"""
+    def act(
+        self,
+        current_msg,
+        memory,
+    ):
+
+        if len(memory) >= self.k:
+            return Action.DROP
+
+        return Action.KEEP
+
+
+class RandomPolicy(BasePolicy):
+    def act(
+        self,
+        current_msg,
+        memory,
+    ):
+
+        return random.choice(
+            [Action.KEEP, Action.DROP, Action.REPLACE_SIMILAR]  # Action.SUMMARIZE,
+        )
+
+
+class SummarizeOldestPolicy(BasePolicy):
+    def __init__(self, k=5):
+
+        self.k = k
+
+    def act(
+        self,
+        current_msg,
+        memory,
+    ):
+
+        if len(memory) < self.k:
+            return Action.KEEP
+
+        return Action.SUMMARIZE
+
+
+class ReplaceSimilarPolicy(BasePolicy):
+    def act(
+        self,
+        current_msg,
+        memory,
+    ):
+
+        idx = find_most_similar_memory(
+            current_msg["message"],
+            memory,
+            threshold=0.7,
+        )
+
+        if idx is not None:
+            return Action.REPLACE_SIMILAR
+
+        return Action.KEEP
