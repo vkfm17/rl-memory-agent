@@ -1,117 +1,76 @@
-"""
-A curriculum task scheduler that:
-1. Starts easy (single fact)
-2. Gradually introduces:
-    - contradictions
-    - distractors
-    - multi-fact reasoning
-    - temporal updates
-3. Tracks performance per level
-4. Controls sampling during training
-"""
-
 from dataclasses import dataclass
-import random
-from typing import Callable
+from typing import Any, Dict
 
-# -----------------------------
-# TASK IMPORTS
-# -----------------------------
 from env.tasks import (
-    generate_contradiction_chain,
+    generate_contradiction_conversation,
+    generate_conversation,
     generate_distractor_heavy,
-    generate_multi_query,
-    generate_profile_with_updates,
-    generate_simple_fact,
+    generate_hard_task,
     generate_temporal_updates,
 )
 
 
-# -----------------------------
-# CURRICULUM LEVEL
-# -----------------------------
 @dataclass
-class CurriculumLevel:
-    name: str
-    tasks: list[Callable]
-    weights: list[float]
+class CurriculumState:
+    level: int = 0
+    success_window: list = None
+    window_size: int = 20
+
+    def __post_init__(self):
+        self.success_window = []
 
 
-# -----------------------------
-# CURRICULUM SCHEDULE
-# -----------------------------
-CURRICULUM = [
-    CurriculumLevel(
-        name="easy",
-        tasks=[
-            generate_simple_fact,
-        ],
-        weights=[1.0],
-    ),
-    CurriculumLevel(
-        name="medium",
-        tasks=[
-            generate_simple_fact,
-            generate_contradiction_chain,
-        ],
-        weights=[0.6, 0.4],
-    ),
-    CurriculumLevel(
-        name="hard",
-        tasks=[
-            generate_contradiction_chain,
-            generate_profile_with_updates,
-            generate_temporal_updates,
-        ],
-        weights=[0.4, 0.3, 0.3],
-    ),
-    CurriculumLevel(
-        name="very_hard",
-        tasks=[
-            generate_profile_with_updates,
-            generate_temporal_updates,
-            generate_distractor_heavy,
-            generate_multi_query,
-        ],
-        weights=[0.25, 0.25, 0.25, 0.25],
-    ),
-]
+class Curriculum:
+    """
+    Controls difficulty progression for memory RL training.
+    """
 
-
-class CurriculumScheduler:
     def __init__(self):
+        self.state = CurriculumState()
 
-        self.level_idx = 0
-        self.episode_counter = 0
+    # ---------------------------------------------------------
+    # TASK SAMPLING
+    # ---------------------------------------------------------
+    def sample_task(self) -> Dict[str, Any]:
 
-    def current_level(self) -> CurriculumLevel:
-        return CURRICULUM[self.level_idx]
+        level = self.state.level
 
-    def sample_task(self):
+        if level == 0:
+            return generate_conversation(num_distractors=5)
 
-        level = self.current_level()
+        elif level == 1:
+            return generate_conversation(num_distractors=10)
 
-        task = random.choices(
-            level.tasks,
-            weights=level.weights,
-            k=1,
-        )[0]
+        elif level == 2:
+            return generate_contradiction_conversation(num_distractors=10)
 
-        return task()
+        elif level == 3:
+            return generate_distractor_heavy()
 
-    # -----------------------------
-    # PROGRESSION LOGIC
-    # -----------------------------
-    def update(self, success_rate: float):
+        elif level == 4:
+            return generate_temporal_updates()
 
-        self.episode_counter += 1
+        else:
+            return generate_hard_task()
 
-        # move up if performing well
-        if success_rate > 0.7 and self.episode_counter > 50:
-            if self.level_idx < len(CURRICULUM) - 1:
-                self.level_idx += 1
-                self.episode_counter = 0
+    # ---------------------------------------------------------
+    # UPDATE RULE
+    # ---------------------------------------------------------
+    def update(self, success: int) -> None:
 
-                print(f"[CURRICULUM] Upgraded to: {self.current_level().name}")
+        self.state.success_window.append(success)
 
-        # optional: prevent collapse backward (can add later)
+        if len(self.state.success_window) > self.state.window_size:
+            self.state.success_window.pop(0)
+
+        avg_success = sum(self.state.success_window) / len(self.state.success_window)
+
+        # promote
+        if avg_success > 0.75:
+            self.state.level += 1
+            self.state.success_window.clear()
+
+        # optional demotion
+        elif avg_success < 0.3:
+            self.state.level = max(0, self.state.level - 1)
+            self.state.success_window.clear()

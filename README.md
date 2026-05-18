@@ -2,408 +2,395 @@
 
 Adaptive Context Compression and Dynamic Memory Consolidation for LLM Agents
 
-Learn a memory-retention policy for conversational agents under constrained context budgets.
+Learn a memory-retention policy for conversational agents under constrained context budgets using reinforcement learning.
 
-This project explores reinforcement learning for:
-- Conversational memory retention
-- Semantic memory compression
-- Contradiction resolution
-- Token-efficient context management
+This project frames memory management as a sequential decision-making problem:
 
-The core question:
+> Which conversational messages are worth preserving under limited context capacity?
 
-> Which memories are worth paying token cost for?
-
-Instead of naive truncation or retrieval heuristics, the agent learns:
-- What to remember
-- What to forget
-- What to summarize
-- What to overwrite
-
-It uses reward signals based on:
-- Retrieval correctness
-- Context efficiency
-- Stale-memory penalties
+Instead of naive truncation or retrieval heuristics, the agent learns to:
+- retain important facts
+- discard irrelevant information
+- replace outdated memories (contradictions)
+- manage memory under pressure
 
 ---
 
-# Motivation
+# Core Idea
 
-LLM agents have limited context windows. Current approaches typically rely on:
-- FIFO truncation
-- Embedding retrieval
-- Heuristics
-- Summarization pipelines
+Conversational memory is modeled as an RL problem:
 
-This project frames conversational memory as a sequential decision-making problem:
+    incoming message
+        ↓
+    memory policy (RL agent)
+        ↓
+    KEEP / DROP / REPLACE_SIMILAR
+        ↓
+    future question answering reward
 
-```text
-incoming message
-    ↓
-memory policy
-    ↓
-KEEP / DROP / SUMMARIZE / REPLACE
-    ↓
-future retrieval reward
-```
-
-The objective is not maximal retention but rather:
-- Adaptive memory compression
-- Semantic memory consolidation
-- Efficient long-horizon recall
+The agent learns selective compression of conversational history under a fixed memory budget.
 
 ---
 
-# Current Features
-
-## Semantic Memory Policy
-
-Observation space includes:
-- Sentence embeddings
-- Memory statistics
-- Temporal metadata
-
-using
-- `sentence-transformers`
-- `all-MiniLM-L6-v2`
-
-The agent must infer memory importance semantically.
-
----
+# Current System (Implemented)
 
 ## Memory Actions
 
-At each timestep the RL policy chooses:
+At each timestep, the policy selects:
 
-- `KEEP`
-- `DROP`
-- `SUMMARIZE`
-- `REPLACE_SIMILAR`
+- KEEP
+- DROP
+- REPLACE_SIMILAR
 
 ### KEEP
-Store message in memory.
+Store message in memory while respecting a fixed memory budget.
 
 ### DROP
-Discard message entirely.
-
-### SUMMARIZE
-Compress message into lower-token representation.
-
-Example:
-
-```text
-"My birthday is June 9 and I love cake."
-↓
-"Birthday: June 9"
-```
+Ignore message (no storage cost).
 
 ### REPLACE_SIMILAR
-Overwrite semantically related stale memories.
+Overwrite the most semantically similar existing memory item.
 
-Example:
+This enables:
+- contradiction handling
+- stale memory replacement
+- semantic deduplication
 
-```text
-"I live in Boston."
-↓
-"I moved to Seattle."
-```
-
-The system learns semantic memory updating rather than FIFO truncation.
+Note: SUMMARIZE exists in earlier design iterations but is currently not part of the active training loop.
 
 ---
 
 # Environment
 
-Synthetic multi-turn conversational environment built with Gymnasium.
+A Gymnasium-based synthetic conversational environment.
+
+Each episode contains:
+- factual statements
+- distractor messages
+- contradictions / updates
+- final query
 
 Example:
 
-```text
-User: I live in Hoboken.
-User: I enjoy hiking.
-User: I moved to Seattle.
-...
-User: Where do I live now?
-```
+    I live in Boston.
+    I enjoy hiking.
+    I moved to Seattle.
+    ...
+    Question: Where do I live now?
 
 Correct answer:
 
-```text
-Seattle
-```
+    Seattle
+
+---
+
+# Curriculum Learning (NEW)
+
+Training uses an adaptive curriculum that gradually increases task difficulty.
+
+Curriculum levels include:
+- simple factual recall
+- distractor-heavy sequences
+- contradiction resolution
+- temporal updates
+- multi-hop retrieval tasks
+
+Difficulty increases based on recent success rate, producing a staged learning progression:
+
+1. memorization
+2. filtering noise
+3. contradiction resolution
+4. long-context robustness
+
+---
+
+# Observation Space
+
+The agent observes:
+
+    [
+        current_message_embedding,
+        memory_size,
+        avg_memory_age,
+        max_memory_age
+    ]
+
+Embeddings are produced using:
+- sentence-transformers
+- all-MiniLM-L6-v2
+
+---
+
+# Memory Representation
+
+Each memory item contains:
+
+    {
+        "message": str,
+        "step": int,
+        "fact_value": Optional[str],
+        "id": int
+    }
+
+Memory is:
+- fixed-size (bounded by max memory)
+- updated via replacement policies
+- semantically searchable via embeddings
 
 ---
 
 # Reward Function
 
-The policy optimizes:
+The reward is computed at episode end:
 
-- Retrieval accuracy
-- Memory efficiency
-- Contradiction resolution
+    reward = (
+        +10 if final answer is correct else -10
+        - memory_token_cost
+    )
 
-Current reward:
+Where:
 
-```python
-reward = (
-    correct_answer * 10
-    - (memory_tokens * 0.002)
-    - incorrect_confident_answer * 5
-)
-```
+    memory_token_cost ∝ total stored messages
 
-Additional ideas:
-- Hallucination penalties
-- Latency penalties
-- Summary compression bonuses
-- Stale-memory penalties
+This encourages:
+- correctness
+- compression efficiency
+- minimal unnecessary retention
 
 ---
 
-# Tasks
+# Task Types
 
 ## Retrieval Tasks
 
-```text
-"My birthday is June 9."
-...
-"What's my birthday?"
-```
+    My birthday is June 9.
+    ...
+    What is my birthday?
 
 ---
 
 ## Contradiction Tasks
 
-```text
-"I live in Boston."
-...
-"I moved to Seattle."
-...
-"Where do I live now?"
-```
+    I live in Boston.
+    I moved to Seattle.
+    ...
+    Where do I live now?
 
 These tasks require:
-- Memory replacement
-- Stale memory deletion
-- Temporal reasoning
+- memory overwrite
+- stale fact deletion
+- temporal reasoning
 
 ---
 
-## Long-Context Distraction
+## Distractor-Heavy Tasks
 
-Large amounts of irrelevant conversation are inserted to test:
-- Selective retention
-- Compression
-- Retrieval robustness
-
----
-
-# Architecture
-
-## Observation Space
-
-Current observation includes:
-
-```python
-[
-    current_message_embedding,
-    memory_size,
-    avg_memory_age,
-    max_memory_age,
-]
-```
-
-Future versions may include:
-- Memory-summary embeddings
-- Retrieval-frequency statistics
-- Attention-based memory representations
+Large amounts of irrelevant messages are inserted to test:
+- selective retention
+- compression robustness
+- noise filtering
 
 ---
 
-## Memory Representation
+## Temporal Update Tasks
 
-Current memory entries:
+    I live in Boston.
+    I moved to Seattle.
+    Now I live in Chicago.
 
-```python
-{
-    "message": "...",
-    "step": timestep,
-    "summarized": False,
-}
-```
-
-Future work:
-- Memory slots
-- Semantic memory graphs
-- Hierarchical memory
-- Learned memory decay
-
----
-
-# Tech Stack
-
-## RL
-
-- `stable-baselines3`
-- PPO
-
-Future:
-- `verl`
-- distributed RLHF-style training
-- GRPO / RLOO
-
----
-
-## NLP
-
-- `sentence-transformers`
-- `all-MiniLM-L6-v2`
-
-Future:
-- TinyLlama
-- SmolLM2
-- Qwen2.5-0.5B-Instruct
-
----
-
-## Environment
-
-- Gymnasium custom environment
-
----
-
-## Evaluation
-
-- Pandas
-- Matplotlib
-- Weights & Biases
-
----
-
-# Evaluation Metrics
-
-Track:
-
-| Metric | Description |
-|---|---|
-| QA Accuracy | Correct retrieval |
-| Avg Context Tokens | Memory efficiency |
-| Compression Ratio | Token reduction |
-| Contradiction Accuracy | Correct stale-memory replacement |
-| Retention Ratio | Fraction of stored messages |
-| Latency | Inference cost |
+These test:
+- temporal reasoning
+- recency handling
+- overwrite consistency
 
 ---
 
 # Baselines
 
-Compare against:
+The system is evaluated against:
 
-- Keep last k
+- Keep last K messages
 - FIFO truncation
 - Random drop
-- Embedding retrieval
-- LRU memory
-- Summarize oldest
+- Embedding similarity retention
+- LRU-style memory
+- Heuristic contradiction replacement
 
 ---
 
-# Current Progress
+# Evaluation Metrics
 
-## Milestone 1
-Rule-based memory manager.
+| Metric | Description |
+|------|-------------|
+| QA Accuracy | Correct final retrieval |
+| Memory Tokens | Storage cost |
+| Compression Ratio | Efficiency of retention |
+| Contradiction Handling | Correct overwrite behavior |
+| Retention Ratio | Fraction of kept messages |
+| Stale Memory Rate | Failure to remove outdated facts |
+| Reward | Final task objective |
 
-## Milestone 2
-PPO memory-retention policy.
+---
 
-## Milestone 3
-Semantic embeddings replacing handcrafted labels.
+# Architecture
 
-## Milestone 4
-Contradiction-aware memory updating.
+## RL Agent
 
-## Milestone 5
-Summarization-based compression.
+- PPO (Stable-Baselines3)
+- MLP policy with [256, 256] hidden layers
+
+---
+
+## Environment
+
+Gymnasium custom environment with:
+- curriculum sampling
+- episodic reward
+- memory simulation
+- contradiction-aware updates
+
+---
+
+## Embeddings
+
+- sentence-transformers
+- all-MiniLM-L6-v2
+
+Used for:
+- message representation
+- similarity-based replacement
+
+---
+
+## Evaluation Stack
+
+- Pandas (aggregation)
+- Matplotlib (visualization)
+- TensorBoard (training + memory stats)
 
 ---
 
 # Project Structure
 
-```text
-rl-memory-agent/
-│
-├── env/
-│   ├── conversation_env.py
-│   ├── tasks.py
-│   ├── features.py
-│
-├── memory/
-│   ├── policies.py
-│   ├── summarizer.py
-│   ├── similarity.py
-│
-├── training/
-│   ├── train_ppo.py
-│
-├── evals/
-│   ├── benchmark.py
-│   ├── metrics.py
-│
-├── notebooks/
-├── results/
-├── README.md
-└── requirements.txt
-```
+    rl-memory-agent/
+    │
+    ├── env/
+    │   ├── conversation_env.py
+    │   ├── curriculum.py
+    │   ├── tasks.py
+    │   ├── features.py
+    │
+    ├── memory/
+    │   ├── policies.py
+    │   ├── similarity.py
+    │   ├── memory_stats.py
+    │
+    ├── training/
+    │   ├── train_ppo.py
+    │
+    ├── evals/
+    │   ├── benchmark.py
+    │   ├── metrics.py
+    │
+    ├── results/
+    ├── notebooks/
+    ├── tensorboard/
+    ├── README.md
+    └── requirements.txt
 
 ---
 
-# Future Directions
+# Current Milestones
 
-## Contextual Memory Policies
+## Milestone 1
+Rule-based memory system (keep-last-K baseline)
 
-Current policy processes messages independently. Future policies may condition on:
-- Compressed memory state
-- Retrieval history
-- Memory summaries
+## Milestone 2
+PPO-based memory policy (KEEP / DROP / REPLACE)
 
-Example:
+## Milestone 3
+Embedding-based similarity memory replacement
 
-```python
-[
-    current_message_embedding,
-    memory_summary_embedding,
-]
-```
+## Milestone 4
+Contradiction-aware memory updates
 
-This enables context-aware memory decisions and adaptive conversational state management.
+## Milestone 5 (current)
+Curriculum learning + stability improvements
 
 ---
 
-## Memory Consolidation
+# Future Work
 
-Move beyond append-only memory toward:
-- Semantic merging
-- Memory rewriting
-- Memory decay
-- Hierarchical summaries
+## LLM-Generated Environments
+
+Replace synthetic task generation with LLM-generated conversations featuring:
+- natural language drift
+- implicit facts
+- realistic dialogue structure
+
+---
+
+## LLM-Based Reward Model
+
+Replace rule-based evaluation with:
+- semantic correctness judging
+- LLM-as-judge scoring
+- hallucination detection
+
+---
+
+## Advanced Memory Systems
+
+- memory graphs
+- hierarchical compression
+- learned decay functions
+- slot-based memory architectures
 
 ---
 
 ## Scaling Experiments
 
-Increase distractor count:
+Increase difficulty:
 
-```text
-10 → 50 → 100 → 1000
-```
+    distractors: 10 → 100 → 1000
+    memory size: 5 → 20 → dynamic
+    delay: short → long-horizon retrieval
 
 Measure:
-- Retrieval accuracy
-- Compression efficiency
-- Memory stability
+- accuracy vs compression curves
+- robustness under noise
+- contradiction resolution stability
 
 ---
 
-## Compression Curves
+## Compression Analysis
 
-Plot accuracy vs memory budget to analyze compression-retrieval tradeoffs, emergent memory policies, and semantic retention behavior.
+Analyze:
+- accuracy vs memory budget
+- reward vs context length
+- retention vs noise ratio
+
+to study emergent memory behavior.
+
+---
+
+# Research Direction
+
+This project explores reinforcement learning as a mechanism for adaptive memory compression in language agents.
+
+It connects:
+- reinforcement learning
+- natural language understanding
+- memory systems and compression
+- agentic LLM architectures
+
+---
+
+# Status
+
+This is an active research prototype exploring:
+- learned memory policies
+- contradiction-aware compression
+- curriculum-driven RL training
+
+It is not a production system, but a foundation for memory-augmented LLM agents with learned context management.

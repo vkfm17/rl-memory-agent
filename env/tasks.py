@@ -1,4 +1,5 @@
 import random
+from typing import Any
 
 # Hard-coded examples
 FACTS = {
@@ -273,3 +274,24 @@ def generate_hard_task():
         generate_multi_query,
     ]
     return random.choice(tasks)()
+
+
+def sample_task_by_difficulty(level: int, num_distractors: int = 10) -> dict[str, Any]:
+
+    if level == 0:
+        return generate_conversation(num_distractors=5)
+
+    elif level == 1:
+        return generate_conversation(num_distractors=num_distractors)
+
+    elif level == 2:
+        return generate_contradiction_conversation(num_distractors=num_distractors)
+
+    elif level == 3:
+        return generate_distractor_heavy()
+
+    elif level == 4:
+        return generate_temporal_updates()
+
+    else:
+        return generate_hard_task()
