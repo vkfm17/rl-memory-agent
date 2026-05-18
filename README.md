@@ -9,10 +9,10 @@ This project frames memory management as a sequential decision-making problem:
 > Which conversational messages are worth preserving under limited context capacity?
 
 Instead of naive truncation or retrieval heuristics, the agent learns to:
-- retain important facts
-- discard irrelevant information
-- replace outdated memories (contradictions)
-- manage memory under pressure
+- Retain important facts
+- Discard irrelevant information
+- Replace outdated memories (contradictions)
+- Manage memory under pressure
 
 ---
 
@@ -52,9 +52,9 @@ Ignore message (no storage cost).
 Overwrite the most semantically similar existing memory item.
 
 This enables:
-- contradiction handling
-- stale memory replacement
-- semantic deduplication
+- Contradiction handling
+- Stale memory replacement
+- Semantic deduplication
 
 Note: SUMMARIZE exists in earlier design iterations but is currently not part of the active training loop.
 
@@ -65,10 +65,10 @@ Note: SUMMARIZE exists in earlier design iterations but is currently not part of
 A Gymnasium-based synthetic conversational environment.
 
 Each episode contains:
-- factual statements
-- distractor messages
-- contradictions / updates
-- final query
+- Factual statements
+- Distractor messages
+- Contradictions / updates
+- Final query
 
 Example:
 
@@ -84,23 +84,23 @@ Correct answer:
 
 ---
 
-# Curriculum Learning (NEW)
+# Curriculum Learning
 
 Training uses an adaptive curriculum that gradually increases task difficulty.
 
 Curriculum levels include:
-- simple factual recall
-- distractor-heavy sequences
-- contradiction resolution
-- temporal updates
-- multi-hop retrieval tasks
+- Simple factual recall
+- Distractor-heavy sequences
+- Contradiction resolution
+- Temporal updates
+- Multi-hop retrieval tasks
 
 Difficulty increases based on recent success rate, producing a staged learning progression:
 
-1. memorization
-2. filtering noise
-3. contradiction resolution
-4. long-context robustness
+1. Memorization
+2. Filtering noise
+3. Contradiction resolution
+4. Long-context robustness
 
 ---
 
@@ -116,8 +116,8 @@ The agent observes:
     ]
 
 Embeddings are produced using:
-- sentence-transformers
-- all-MiniLM-L6-v2
+- `sentence-transformers`
+- `all-MiniLM-L6-v2`
 
 ---
 
@@ -128,14 +128,14 @@ Each memory item contains:
     {
         "message": str,
         "step": int,
-        "fact_value": Optional[str],
+        "fact_value": str | None,
         "id": int
     }
 
 Memory is:
-- fixed-size (bounded by max memory)
-- updated via replacement policies
-- semantically searchable via embeddings
+- Fixed-size (bounded by max memory)
+- Updated via replacement policies
+- Semantically searchable via embeddings
 
 ---
 
@@ -153,9 +153,9 @@ Where:
     memory_token_cost ∝ total stored messages
 
 This encourages:
-- correctness
-- compression efficiency
-- minimal unnecessary retention
+- Correctness
+- Compression efficiency
+- Minimal unnecessary retention
 
 ---
 
@@ -177,18 +177,18 @@ This encourages:
     Where do I live now?
 
 These tasks require:
-- memory overwrite
-- stale fact deletion
-- temporal reasoning
+- Memory overwrite
+- Stale fact deletion
+- Temporal reasoning
 
 ---
 
 ## Distractor-Heavy Tasks
 
 Large amounts of irrelevant messages are inserted to test:
-- selective retention
-- compression robustness
-- noise filtering
+- Selective retention
+- Compression robustness
+- Noise filtering
 
 ---
 
@@ -199,9 +199,9 @@ Large amounts of irrelevant messages are inserted to test:
     Now I live in Chicago.
 
 These test:
-- temporal reasoning
-- recency handling
-- overwrite consistency
+- Temporal reasoning
+- Recency handling
+- Overwrite consistency
 
 ---
 
@@ -244,29 +244,27 @@ The system is evaluated against:
 ## Environment
 
 Gymnasium custom environment with:
-- curriculum sampling
-- episodic reward
-- memory simulation
-- contradiction-aware updates
+- Curriculum sampling
+- Episodic reward
+- Memory simulation
+- Contradiction-aware updates
 
 ---
 
 ## Embeddings
 
-- sentence-transformers
-- all-MiniLM-L6-v2
+- `sentence-transformers`
+- `all-MiniLM-L6-v2`
 
-Used for:
-- message representation
-- similarity-based replacement
+Used for message representation and similarity-based replacement.
 
 ---
 
 ## Evaluation Stack
 
-- Pandas (aggregation)
-- Matplotlib (visualization)
-- TensorBoard (training + memory stats)
+- pandas (aggregation)
+- matplotlib (visualization)
+- tensorBoard (training + memory stats)
 
 ---
 
@@ -324,27 +322,27 @@ Curriculum learning + stability improvements
 ## LLM-Generated Environments
 
 Replace synthetic task generation with LLM-generated conversations featuring:
-- natural language drift
-- implicit facts
-- realistic dialogue structure
+- Natural language drift
+- Implicit facts
+- Realistic dialogue structure
 
 ---
 
 ## LLM-Based Reward Model
 
 Replace rule-based evaluation with:
-- semantic correctness judging
+- Semantic correctness judging
 - LLM-as-judge scoring
-- hallucination detection
+- Hallucination detection
 
 ---
 
 ## Advanced Memory Systems
 
-- memory graphs
-- hierarchical compression
-- learned decay functions
-- slot-based memory architectures
+- Memory graphs
+- Hierarchical compression
+- Learned decay functions
+- Slot-based memory architectures
 
 ---
 
@@ -357,18 +355,18 @@ Increase difficulty:
     delay: short → long-horizon retrieval
 
 Measure:
-- accuracy vs compression curves
-- robustness under noise
-- contradiction resolution stability
+- Accuracy vs compression curves
+- Robustness under noise
+- Contradiction resolution stability
 
 ---
 
 ## Compression Analysis
 
 Analyze:
-- accuracy vs memory budget
-- reward vs context length
-- retention vs noise ratio
+- Accuracy vs memory budget
+- Reward vs context length
+- Retention vs noise ratio
 
 to study emergent memory behavior.
 
@@ -379,18 +377,18 @@ to study emergent memory behavior.
 This project explores reinforcement learning as a mechanism for adaptive memory compression in language agents.
 
 It connects:
-- reinforcement learning
-- natural language understanding
-- memory systems and compression
-- agentic LLM architectures
+- Reinforcement learning
+- Natural language understanding
+- Memory systems and compression
+- Agentic LLM architectures
 
 ---
 
 # Status
 
 This is an active research prototype exploring:
-- learned memory policies
-- contradiction-aware compression
-- curriculum-driven RL training
+- Learned memory policies
+- Contradiction-aware compression
+- Curriculum-driven RL training
 
 It is not a production system, but a foundation for memory-augmented LLM agents with learned context management.
