@@ -1,24 +1,38 @@
+import os
+
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_checker import check_env
 
-from constants import TB_LOG_DIR, TOTAL_STEPS
 from env.conversation_env import ConversationEnv
+from training.config import TrainingConfig
 
-env = ConversationEnv()
-check_env(env)
 
-policy_kwargs = dict(net_arch=[256, 256])
+def train(config: TrainingConfig) -> PPO:
+    os.makedirs(config.run_dir, exist_ok=True)
 
-model = PPO(
-    "MlpPolicy",
-    env,
-    verbose=1,
-    learning_rate=1e-4,
-    n_steps=128,
-    batch_size=32,
-    policy_kwargs=policy_kwargs,
-    tensorboard_log=TB_LOG_DIR,
-)
+    env = ConversationEnv(
+        max_memory=config.max_memory,
+        base_distractors=config.base_distractors,
+        curriculum_checkpoint=config.curriculum_checkpoint,
+        tb_log_dir=config.tb_log_dir,
+    )
 
-model.learn(total_timesteps=TOTAL_STEPS)
-model.save("ppo_memory_agent")
+    model = PPO(
+        "MlpPolicy",
+        env,
+        verbose=1,
+        learning_rate=config.learning_rate,
+        n_steps=config.n_steps,
+        batch_size=config.batch_size,
+        policy_kwargs=dict(net_arch=config.net_arch),
+        tensorboard_log=config.tb_log_dir,
+    )
+
+    model.learn(total_timesteps=config.total_steps)
+    model.save(config.model_path)
+
+    return model
+
+
+if __name__ == "__main__":
+    train(TrainingConfig())

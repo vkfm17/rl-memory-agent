@@ -88,36 +88,38 @@ Correct answer:
 
 Training uses an adaptive curriculum that gradually increases task difficulty.
 
-Curriculum levels include:
-- Simple factual recall
-- Distractor-heavy sequences
-- Contradiction resolution
-- Temporal updates
-- Multi-hop retrieval tasks
+| Level | Task type | Distractors |
+|---|---|---|
+| 0 | Simple factual recall | `base_distractors / 2` |
+| 1 | Factual recall | `base_distractors` |
+| 2 | Contradiction resolution | `base_distractors` |
+| 3 | Distractor-heavy (fixed scenario) | high |
+| 4 | Temporal updates (fixed scenario) | — |
+| 5+ | Hard tasks (mixed) | — |
 
-Difficulty increases based on recent success rate, producing a staged learning progression:
+**Promotion / demotion** fires only after a full window of 20 episodes: promote if avg success > 75%, demote if < 30%. Evaluating on a partial window is suppressed to prevent single-sample cascades.
 
-1. Memorization
-2. Filtering noise
-3. Contradiction resolution
-4. Long-context robustness
+**Persistence**: curriculum state (level + success window) is saved to `curriculum_state.json` after every episode and restored on the next training run. Pass `curriculum_level=N` to `ConversationEnv` to pin to a fixed level without affecting saved state (used for benchmarking).
+
+`base_distractors` is configurable per run, allowing the distractor density to be swept independently of curriculum level.
 
 ---
 
 # Observation Space
 
-The agent observes:
+The observation is a concatenated vector of four components:
 
-    [
-        current_message_embedding,
-        memory_size,
-        avg_memory_age,
-        max_memory_age
-    ]
+| Component | Dim | Description |
+|---|---|---|
+| Current message embedding | 384 | `all-MiniLM-L6-v2` sentence embedding |
+| Memory mean embedding | 384 | Mean-pooled embedding of all items currently in memory (zeros if empty) |
+| Heuristic features | 7 | Number presence, location match, name match, message length, retrieval frequency, importance prior, temporal update marker |
+| Metadata | 4 | Memory size, current step, avg memory age, max memory age |
+| Per-slot similarities | `max_memory` | Cosine similarity between the current message and each memory slot (padded with zeros for empty slots) |
 
-Embeddings are produced using:
-- `sentence-transformers`
-- `all-MiniLM-L6-v2`
+Default total: **784 dims** (with `max_memory=5`). Scales with `max_memory`.
+
+Embeddings are produced using `sentence-transformers` / `all-MiniLM-L6-v2`, cached locally in `models/`.
 
 ---
 
@@ -141,21 +143,20 @@ Memory is:
 
 # Reward Function
 
-The reward is computed at episode end:
+Rewards are issued at two levels:
 
-    reward = (
-        +10 if final answer is correct else -10
-        - memory_token_cost
-    )
+**Step reward** (every timestep):
 
-Where:
+    DROP a distractor (fact_value is None):  +0.1
+    DROP a fact (fact_value is not None):    -0.2
 
-    memory_token_cost ∝ total stored messages
+**Terminal reward** (episode end):
 
-This encourages:
-- Correctness
-- Compression efficiency
-- Minimal unnecessary retention
+    reward = (+10 if correct else -10) - len(memory) * 0.05
+
+Correctness is determined by whether any retained memory item's `fact_value` matches the episode answer, including tuple-valued facts from multi-fact tasks.
+
+The step rewards are small relative to the terminal signal (~2% of ±10) so they shape without dominating. They provide a dense training signal for distractor filtering, which is otherwise only rewarded implicitly through reduced memory cost.
 
 ---
 
@@ -207,14 +208,13 @@ These test:
 
 # Baselines
 
-The system is evaluated against:
+The system is evaluated against three rule-based policies in `memory/policies.py`:
 
-- Keep last K messages
-- FIFO truncation
-- Random drop
-- Embedding similarity retention
-- LRU-style memory
-- Heuristic contradiction replacement
+| Baseline | Behavior |
+|---|---|
+| `KeepLastKPolicy` | Always KEEP until memory is full, then DROP |
+| `RandomPolicy` | Uniform random action each step |
+| `ReplaceSimilarPolicy` | REPLACE_SIMILAR if cosine similarity > 0.7, else KEEP |
 
 ---
 
@@ -237,26 +237,24 @@ The system is evaluated against:
 ## RL Agent
 
 - PPO (Stable-Baselines3)
-- MLP policy with [256, 256] hidden layers
+- MLP policy, configurable hidden layers (default `[256, 256]`)
 
----
+Key `ConversationEnv` parameters:
 
-## Environment
-
-Gymnasium custom environment with:
-- Curriculum sampling
-- Episodic reward
-- Memory simulation
-- Contradiction-aware updates
+| Parameter | Default | Description |
+|---|---|---|
+| `max_memory` | 5 | Memory budget (also sets obs dim) |
+| `base_distractors` | 10 | Distractor count at curriculum level 1 |
+| `curriculum_level` | `None` | Pin to fixed level (benchmarking); `None` resumes from checkpoint |
+| `tb_log_dir` | `tensorboard/env` | TensorBoard output directory |
 
 ---
 
 ## Embeddings
 
-- `sentence-transformers`
-- `all-MiniLM-L6-v2`
-
-Used for message representation and similarity-based replacement.
+- `sentence-transformers` / `all-MiniLM-L6-v2`
+- Weights cached locally in `models/all-MiniLM-L6-v2/` (not committed); downloaded automatically on first run
+- Single lazy-loaded global encoder instance per process
 
 ---
 
@@ -273,27 +271,29 @@ Used for message representation and similarity-based replacement.
     rl-memory-agent/
     │
     ├── env/
-    │   ├── conversation_env.py
-    │   ├── curriculum.py
-    │   ├── tasks.py
-    │   ├── features.py
+    │   ├── conversation_env.py   # Gymnasium env; parameterized by max_memory, base_distractors
+    │   ├── curriculum.py         # Adaptive difficulty; persistent checkpoint
+    │   ├── tasks.py              # Synthetic conversation generators
+    │   ├── features.py           # Embeddings, heuristics, obs vector builder
     │
     ├── memory/
-    │   ├── policies.py
-    │   ├── similarity.py
-    │   ├── memory_stats.py
+    │   ├── policies.py           # Baseline rule-based policies
+    │   ├── similarity.py         # Cosine similarity search over memory
+    │   ├── memory_stats.py       # Per-episode diagnostic metrics
     │
     ├── training/
-    │   ├── train_ppo.py
+    │   ├── config.py             # TrainingConfig dataclass with per-run paths
+    │   ├── train_ppo.py          # train(config) -> PPO; runnable as __main__
+    │   ├── sweep.py              # Scaling experiment grid; python -m training.sweep
     │
     ├── evals/
-    │   ├── benchmark.py
-    │   ├── metrics.py
+    │   ├── benchmark.py          # benchmark_ppo / benchmark_all / benchmark_policy
+    │   ├── metrics.py            # Episode-level metric functions
     │
-    ├── results/
-    ├── notebooks/
-    ├── tensorboard/
-    ├── README.md
+    ├── plans/                    # Design docs and next-step plans
+    ├── models/                   # Local embedder weights (gitignored)
+    ├── results/                  # Per-run model checkpoints and eval summaries
+    ├── tensorboard/              # TensorBoard logs (per run)
     └── requirements.txt
 
 ---
@@ -312,8 +312,15 @@ Embedding-based similarity memory replacement
 ## Milestone 4
 Contradiction-aware memory updates
 
-## Milestone 5 (current)
+## Milestone 5
 Curriculum learning + stability improvements
+
+## Milestone 6 (current)
+- Expanded observation space: memory mean embedding + heuristic features + per-slot similarities (388 → 784 dims)
+- Dense intermediate rewards for step-level distractor filtering
+- Fixed correctness signal for multi-fact tasks
+- Curriculum persistence across training runs + promotion/demotion bug fix
+- Parameterized environment and training config; scaling experiment sweep infrastructure
 
 ---
 
@@ -343,21 +350,6 @@ Replace rule-based evaluation with:
 - Hierarchical compression
 - Learned decay functions
 - Slot-based memory architectures
-
----
-
-## Scaling Experiments
-
-Increase difficulty:
-
-    distractors: 10 → 100 → 1000
-    memory size: 5 → 20 → dynamic
-    delay: short → long-horizon retrieval
-
-Measure:
-- Accuracy vs compression curves
-- Robustness under noise
-- Contradiction resolution stability
 
 ---
 

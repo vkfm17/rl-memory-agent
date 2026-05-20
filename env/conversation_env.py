@@ -1,5 +1,4 @@
 from collections import defaultdict
-from typing import List
 
 import gymnasium as gym
 import numpy as np
@@ -15,7 +14,14 @@ from typedefs import Action, MemoryEvent, MemoryItem
 
 
 class ConversationEnv(gym.Env):
-    def __init__(self):
+    def __init__(
+        self,
+        max_memory: int = MAX_MEMORY,
+        base_distractors: int = 10,
+        curriculum_level: int | None = None,
+        curriculum_checkpoint: str | None = None,
+        tb_log_dir: str = "tensorboard/env",
+    ):
         super().__init__()
 
         # -----------------------------
@@ -23,18 +29,20 @@ class ConversationEnv(gym.Env):
         # -----------------------------
         self.action_space = spaces.Discrete(len(Action))
 
+        # 384 (msg) + 384 (memory mean) + 7 (heuristics) + 4 (metadata) + max_memory (sims)
+        obs_dim = 384 + 384 + 7 + 4 + max_memory
         self.observation_space = spaces.Box(
             low=-np.inf,
             high=np.inf,
-            shape=(388,),
+            shape=(obs_dim,),
             dtype=np.float32,
         )
 
         # -----------------------------
         # MEMORY
         # -----------------------------
-        self.memory: List[MemoryItem] = []
-        self.max_memory = MAX_MEMORY
+        self.memory: list[MemoryItem] = []
+        self.max_memory = max_memory
 
         # -----------------------------
         # CONVERSATION
@@ -59,12 +67,16 @@ class ConversationEnv(gym.Env):
         # -----------------------------
         # CURRICULUM
         # -----------------------------
-        self.curriculum = Curriculum()
+        self.curriculum = Curriculum(
+            level=curriculum_level,
+            base_distractors=base_distractors,
+            checkpoint=curriculum_checkpoint,
+        )
 
         # -----------------------------
         # TENSORBOARD
         # -----------------------------
-        self.writer = SummaryWriter("tensorboard/env")
+        self.writer = SummaryWriter(tb_log_dir)
         self.global_step = 0
 
     # =========================================================
@@ -106,7 +118,7 @@ class ConversationEnv(gym.Env):
             [len(self.memory), step, avg_age, max_age], dtype=np.float32
         )
 
-        return build_embedding_features(msg, metadata)
+        return build_embedding_features(msg, metadata, self.memory, self.max_memory)
 
     # =========================================================
     # STEP
@@ -147,6 +159,9 @@ class ConversationEnv(gym.Env):
         # -----------------------------
         # ACTIONS
         # -----------------------------
+        reward = 0.0
+        is_fact = msg.get("fact_value") is not None
+
         if action == Action.KEEP:
             if len(self.memory) >= self.max_memory:
                 old = self.memory.pop(0)
@@ -156,7 +171,10 @@ class ConversationEnv(gym.Env):
             self.memory.append(create_memory(msg, self.current_step))
 
         elif action == Action.DROP:
-            pass
+            if not is_fact:
+                reward += 0.1   # correctly discarded a distractor
+            else:
+                reward -= 0.2   # dropped a relevant fact
 
         elif action == Action.REPLACE_SIMILAR:
             idx = find_most_similar_memory(msg["message"], self.memory)
@@ -174,6 +192,9 @@ class ConversationEnv(gym.Env):
             else:
                 self.memory.append(create_memory(msg, self.current_step))
 
+        if reward != 0.0:
+            self.writer.add_scalar("step/reward", reward, self.global_step)
+
         # -----------------------------
         # STEP ADVANCE
         # -----------------------------
@@ -182,7 +203,6 @@ class ConversationEnv(gym.Env):
         terminated = self.current_step >= len(self.conversation)
         truncated = False
 
-        reward = 0.0
         info = {}
 
         # =====================================================
@@ -195,13 +215,16 @@ class ConversationEnv(gym.Env):
                 current_step=self.current_step,
             )
 
-            remembered = [m for m in self.memory if m.get("fact_value") is not None]
-
             correct = 0
-
-            if remembered:
-                latest = sorted(remembered, key=lambda x: x["step"])[-1]["fact_value"]
-                correct = int(latest == self.answer)
+            for m in self.memory:
+                fv = m.get("fact_value")
+                if fv is None:
+                    continue
+                # fact_value is a tuple (type, value) in multi-fact tasks
+                match = fv == self.answer or (isinstance(fv, tuple) and self.answer in fv)
+                if match:
+                    correct = 1
+                    break
 
             reward = (10 if correct else -10) - len(self.memory) * 0.05
 

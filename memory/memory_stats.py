@@ -1,4 +1,4 @@
-from typing import Any, Dict, List
+from typing import Any
 
 import numpy as np
 
@@ -10,7 +10,7 @@ def count_tokens(text: str) -> int:
     return len(text.split())
 
 
-def memory_token_count(memory: List[Dict[str, Any]]) -> int:
+def memory_token_count(memory: list[dict[str, Any]]) -> int:
     return sum(count_tokens(m["message"]) for m in memory)
 
 
@@ -18,7 +18,7 @@ def memory_token_count(memory: List[Dict[str, Any]]) -> int:
 # Age statistics
 # -----------------------------
 def memory_age_stats(
-    memory: List[Dict[str, Any]],
+    memory: list[dict[str, Any]],
     current_step: int,
 ):
 
@@ -40,7 +40,7 @@ def memory_age_stats(
 # Memory structure stats
 # -----------------------------
 def memory_structure_stats(
-    memory: List[Dict[str, Any]],
+    memory: list[dict[str, Any]],
 ):
 
     if not memory:
@@ -67,7 +67,7 @@ def memory_structure_stats(
 # Retention efficiency
 # -----------------------------
 def retention_ratio(
-    memory: List[Dict[str, Any]],
+    memory: list[dict[str, Any]],
     conversation_length: int,
 ):
 
@@ -81,8 +81,8 @@ def retention_ratio(
 # Compression efficiency
 # -----------------------------
 def compression_ratio(
-    memory: List[Dict[str, Any]],
-    conversation: List[Dict[str, Any]],
+    memory: list[dict[str, Any]],
+    conversation: list[dict[str, Any]],
 ):
 
     mem_tokens = memory_token_count(memory)
@@ -99,7 +99,7 @@ def compression_ratio(
 # Stale memory heuristic (MVP)
 # -----------------------------
 def stale_memory_signal(
-    memory: List[Dict[str, Any]],
+    memory: list[dict[str, Any]],
 ):
     """
     MVP heuristic:
@@ -121,8 +121,8 @@ def stale_memory_signal(
 # FULL FEATURE PACK
 # -----------------------------
 def compute_memory_stats(
-    memory: List[Dict[str, Any]],
-    conversation: List[Dict[str, Any]],
+    memory: list[dict[str, Any]],
+    conversation: list[dict[str, Any]],
     current_step: int,
 ):
 

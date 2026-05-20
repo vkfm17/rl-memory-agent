@@ -1,6 +1,10 @@
 results/
 .DS_Store
 tensorboard/
+models/
+curriculum_state.json
+plans/
+CLAUDE.md
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

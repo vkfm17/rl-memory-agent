@@ -1,7 +1,13 @@
+import os
 import re
+from typing import Any
 
 import numpy as np
 from sentence_transformers import SentenceTransformer
+
+from constants import MAX_MEMORY
+
+_MODEL_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "models", "all-MiniLM-L6-v2")
 
 # Hard-coded heuristics
 
@@ -47,7 +53,8 @@ _encoder = None
 def get_encoder():
     global _encoder
     if _encoder is None:
-        _encoder = SentenceTransformer("all-MiniLM-L6-v2")
+        model_path = _MODEL_DIR if os.path.isdir(_MODEL_DIR) else "all-MiniLM-L6-v2"
+        _encoder = SentenceTransformer(model_path)
     return _encoder
 
 
@@ -168,15 +175,44 @@ def build_feature_vector(message: str) -> np.ndarray:
     )
 
 
+def build_memory_embedding(memory: list[dict[str, Any]]) -> np.ndarray:
+    """Mean-pool embeddings of current memory items; zeros if memory is empty."""
+    if not memory:
+        return np.zeros(384, dtype=np.float32)
+    embeddings = np.stack([embed_message(m["message"]) for m in memory])
+    mean = embeddings.mean(axis=0)
+    norm = np.linalg.norm(mean)
+    return (mean / norm).astype(np.float32) if norm > 0 else mean
+
+
+def build_memory_similarities(
+    msg_embedding: np.ndarray,
+    memory: list[dict[str, Any]],
+    max_memory: int = MAX_MEMORY,
+) -> np.ndarray:
+    """Cosine similarity of the current message against each memory slot (padded to max_memory)."""
+    sims = np.zeros(max_memory, dtype=np.float32)
+    for i, m in enumerate(memory[:max_memory]):
+        mem_emb = embed_message(m["message"])
+        denom = np.linalg.norm(msg_embedding) * np.linalg.norm(mem_emb)
+        sims[i] = float(np.dot(msg_embedding, mem_emb) / denom) if denom > 0 else 0.0
+    return sims
+
+
 def build_embedding_features(
     message: str,
     metadata: np.ndarray,
+    memory: list[dict[str, Any]] | None = None,
+    max_memory: int = MAX_MEMORY,
 ) -> np.ndarray:
-    """Use embeddings, memory size, and message age to"""
-    embedding = embed_message(message)
-    return np.concatenate(
-        [
-            embedding,
-            metadata,
-        ]
-    )
+    """
+    Observation vector: current msg embedding (384) + memory mean embedding (384)
+    + heuristic features (7) + metadata (4) + per-slot similarity (max_memory).
+    """
+    if memory is None:
+        memory = []
+    msg_embedding = embed_message(message)
+    memory_embedding = build_memory_embedding(memory)
+    heuristics = build_feature_vector(message)
+    similarities = build_memory_similarities(msg_embedding, memory, max_memory)
+    return np.concatenate([msg_embedding, memory_embedding, heuristics, metadata, similarities])
